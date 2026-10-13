@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6b1d0f"/>
+      <stop offset="0.45" stop-color="#d9531e"/>
+      <stop offset="0.8" stop-color="#f6a531"/>
+      <stop offset="1" stop-color="#ffd66b"/>
+    </linearGradient>
+    <clipPath id="disc"><circle cx="128" cy="128" r="120"/></clipPath>
+  </defs>
+  <circle cx="128" cy="128" r="124" fill="#3a1a0c"/>
+  <g clip-path="url(#disc)">
+    <rect x="0" y="0" width="256" height="256" fill="url(#sky)"/>
+    <circle cx="86" cy="168" r="34" fill="#ffe9a8" opacity="0.95"/>
+    <path d="M0 176 C40 168 70 172 110 170 C150 168 190 160 256 166 L256 256 L0 256 Z" fill="#2a1408"/>
+    <!-- acacia: trunk and flat-topped crown -->
+    <path d="M168 178 C166 150 160 128 150 112 L156 110 C164 124 170 138 172 150 C176 132 186 118 198 108 L203 112 C190 124 180 142 178 178 Z" fill="#1c0d05"/>
+    <path d="M112 108 C130 92 160 86 186 88 C210 86 236 94 248 106 C232 112 208 114 186 113 C160 116 134 116 112 108 Z" fill="#1c0d05"/>
+    <!-- grass -->
+    <path d="M20 180 l4 -14 l2 14 l5 -18 l2 18 l4 -11 l1 11 Z M222 172 l3 -12 l2 12 l4 -16 l2 16 l3 -10 l1 10 Z" fill="#1c0d05"/>
+  </g>
+  <circle cx="128" cy="128" r="120" fill="none" stroke="#e9c27a" stroke-width="6"/>
+</svg>
