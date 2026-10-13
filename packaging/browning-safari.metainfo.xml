@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>browning-safari</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <name>Browning African Safari</name>
+  <summary>Native Linux port of the 1998 safari hunting game</summary>
+  <description>
+    <p>A native SDL2 port of The Browning African Safari (Oquirrh Productions, 1998),
+    rebuilt from the original Windows program. The game data is not included: on first
+    start the game copies it from your original CD or a SAFARI.iso image.</p>
+  </description>
+  <launchable type="desktop-id">browning-safari.desktop</launchable>
+  <categories><category>Game</category></categories>
+</component>

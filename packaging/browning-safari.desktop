@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Browning African Safari
+GenericName=Hunting Adventure
+Comment=The 1998 African safari hunting game, running natively
+Exec=browning-safari %f
+Icon=browning-safari
+Terminal=false
+Categories=Game;AdventureGame;
+Keywords=safari;africa;hunting;1998;
+StartupWMClass=browning-safari
