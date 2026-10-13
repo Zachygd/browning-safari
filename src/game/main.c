@@ -231,6 +231,7 @@ void ExitScreen(int param)
 void SwitchScreen(int which)
 {
     if (game_screen == which) return;
+    if (debug) Log("SwitchScreen %d -> %d", game_screen, which);
     MouseHourGlass();
     switch (game_screen) {
     case 5: DumpMuseumScreen(); break;
@@ -283,6 +284,7 @@ void SwitchScreen(int which)
 void TempSwitchScreen(int which)
 {
     if (which == game_screen) return;
+    if (debug) Log("TempSwitchScreen %d -> %d", game_screen, which);
     MouseHourGlass();
     switch (game_screen) {
     case 0xd: DumpScopesScreen(); break;
@@ -365,6 +367,7 @@ void GameLoop(void)
     while (done == 0) {
         CheckEvents();
         if (func_ptr[game_screen]) func_ptr[game_screen]();
+        sys_throttle(4);
     }
 }
 

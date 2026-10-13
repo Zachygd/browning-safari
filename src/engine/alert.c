@@ -132,8 +132,18 @@ int AlertBox(const char *str, const char *btn)
     int xpos = 320, ypos = 240;
     int done = 0;
     while (!done) {
-        int r;
-        do { r = GetDialogInput(&xpos, &ypos); } while (r == 0);
+        int r, key = 0;
+        do {
+            r = GetDialogInput(&xpos, &ypos);
+            /* PORT: Enter or Esc closes a one-button box ("Okay", "Resume") */
+            if (!r && numbutts == 1 && (lastCode == 0x1c || lastCode == 0x01)) key = 1;
+        } while (r == 0 && !key);
+        if (key) {
+            SoundPlay(0);
+            done = 1;
+            ret = 1;
+            break;
+        }
         int i = DLG_Check(dialog, xpos, ypos);
         if (i > 6 && i < 10) {
             SoundPlay(0);

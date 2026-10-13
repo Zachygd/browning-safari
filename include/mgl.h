@@ -106,7 +106,9 @@ void     sys_pump(void);
 void     sys_present(int force);
 uint32_t sys_ms(void);
 void     sys_mark_dirty(void);
+void     sys_throttle(uint32_t ms);
 extern int sys_quit_requested;
+extern void (*sys_quit_hook)(void);   /* runs once when the window is closed */
 extern MGLDC *sys_display;
 
 #endif

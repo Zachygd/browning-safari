@@ -296,12 +296,6 @@ void CheckEvents(void)
     lastInput = 0;
     lastKey = 0;
     lastCode = 0;
-    if (sys_quit_requested && game_screen != 0x11) {
-        /* window close button: behave like the Exit button */
-        sys_quit_requested = 0;
-        DoExit(0);
-        return;
-    }
     if (!EVT_getNext(&evt, EVT_EVERYEVT)) return;
     switch (evt.what) {
     case EVT_KEYDOWN:
