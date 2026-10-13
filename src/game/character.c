@@ -31,10 +31,15 @@ static short lip_next(lipsync_t *l)
     return v;
 }
 
+/* PORT: drain key presses while someone talks so that a stray key can't
+ * sit at the head of the queue and hide a later Esc */
 static int escPressed(void)
 {
     event_t e;
-    return EVT_peekNext(&e, EVT_KEYDOWN) && ((e.message >> 8) & 0xff) == 0x01;
+    int esc = 0;
+    while (EVT_getNext(&e, EVT_KEYDOWN))
+        if (((e.message >> 8) & 0xff) == 0x01) esc = 1;
+    return esc;
 }
 
 void DoCharacterComment(int bkg, int character, int comment, int xpos, int ypos)

@@ -3,7 +3,7 @@
 
 Name:           browning-safari
 Version:        1.02
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Native Linux port of The Browning African Safari (1998)
 License:        LicenseRef-Proprietary
 Source0:        %{name}-%{version}.tar.gz
@@ -40,5 +40,10 @@ rm -f %{buildroot}%{_docdir}/%{name}/README.md
 %{_datadir}/metainfo/browning-safari.metainfo.xml
 
 %changelog
+* Tue Oct 13 2026 Zach - 1.02-2
+- Closing the window now quits immediately from any screen (saving first)
+- Fix sounds that could hang the game waiting for the wrong channel
+- Enter/Esc close one-button message boxes; Esc reliably skips speech
+- Lower CPU use
 * Mon Oct 12 2026 Zach - 1.02-1
 - Native SDL2 port of version 1.02

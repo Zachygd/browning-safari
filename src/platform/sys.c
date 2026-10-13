@@ -6,14 +6,44 @@
  * 32-bit texture and scaled (keeping 4:3) into a resizable window.
  */
 #include <SDL.h>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "mgl.h"
 
 MGLDC *sys_display;
 int sys_quit_requested;
 void (*sys_idle_hook)(void);
+void (*sys_quit_hook)(void);
+
+static volatile sig_atomic_t got_signal;
+
+/* SIGTERM / SIGINT / SIGHUP (logout, "End process" in System Monitor,
+ * Ctrl+C): ask the main loop to quit, and make sure the process goes away
+ * a few seconds later even if the game is stuck somewhere. */
+static void on_signal(int sig)
+{
+    (void)sig;
+    got_signal = 1;
+    alarm(4);   /* default SIGALRM action terminates the process */
+}
+
+/* Window closed (Alt+F4, the close button) or a termination signal:
+ * save whatever needs saving and leave immediately.  This is called from
+ * the event pump, so it works no matter which screen or dialog is up. */
+static void sys_quit_now(void)
+{
+    static int quitting;
+    if (quitting) return;
+    quitting = 1;
+    sys_quit_requested = 1;
+    alarm(5);   /* never hang on the way out */
+    if (sys_quit_hook) sys_quit_hook();
+    sys_shutdown();
+    _exit(0);
+}
 
 static SDL_Window   *win;
 static SDL_Renderer *ren;
@@ -165,9 +195,8 @@ void sys_pump(void)
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
         switch (ev.type) {
-        case SDL_QUIT: if (getenv("SAFARI_DEBUG")) fprintf(stderr, "SDL_QUIT\n");
-            sys_quit_requested++;
-            if (sys_quit_requested > 2) exit(0);
+        case SDL_QUIT:
+            sys_quit_now();
             break;
         case SDL_WINDOWEVENT:
             dirty = 1;
@@ -205,6 +234,7 @@ void sys_pump(void)
             break;
         }
     }
+    if (got_signal) sys_quit_now();
     if (sys_idle_hook) sys_idle_hook();
     sys_present(0);
 }
@@ -275,7 +305,7 @@ void sys_present(int force)
 {
     uint32_t now = SDL_GetTicks();
     if (!sys_display) return;
-    if (!force && (!dirty || now - lastPresent < 8)) return;
+    if (!force && (!dirty || now - lastPresent < 16)) return;   /* ~60 fps */
     uint32_t lut[256];
     for (int i = 0; i < 256; i++) {
         palette_t p = sys_display->pal[i];
@@ -294,12 +324,47 @@ void sys_present(int force)
 
 uint32_t sys_ms(void) { return SDL_GetTicks(); }
 
+/* PORT: the original's main loop spun flat out.  Give each pass at least
+ * a few milliseconds so the game doesn't keep a CPU core at 100%.  All game
+ * timing is clock based, so this doesn't change how it plays. */
+void sys_throttle(uint32_t ms)
+{
+    static uint32_t last;
+    uint32_t now = SDL_GetTicks();
+    if (now - last < ms) SDL_Delay(ms - (now - last));
+    last = SDL_GetTicks();
+}
+
+/* debugging aid: SAFARI_WATCHDOG=n aborts (with a backtrace under a
+ * sanitizer build) if the event pump hasn't run for n seconds */
+static int watchdog(void *arg)
+{
+    uint32_t limit = (uint32_t)(uintptr_t)arg * 1000;
+    for (;;) {
+        SDL_Delay(500);
+        if (lastPump && SDL_GetTicks() - lastPump > limit) {
+            fprintf(stderr, "WATCHDOG: event pump stalled for %u ms\n", SDL_GetTicks() - lastPump);
+            abort();
+        }
+    }
+    return 0;
+}
+
 int sys_init(void)
 {
     /* let the desktop match the window to browning-safari.desktop */
     setenv("SDL_VIDEO_X11_WMCLASS", "browning-safari", 0);
     setenv("SDL_VIDEO_WAYLAND_WMCLASS", "browning-safari", 0);
     setenv("SDL_APP_ID", "browning-safari", 0);
+    /* handle SIGTERM/SIGINT ourselves (see on_signal) */
+    SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = on_signal;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGHUP, &sa, NULL);
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return 0;
@@ -323,6 +388,8 @@ int sys_init(void)
     if (!tex) { SDL_Log("texture: %s", SDL_GetError()); return 0; }
     SDL_ShowCursor(SDL_DISABLE);   /* the game draws its own cursor */
     sys_display = MGL_createDisplayDC();
+    const char *wd = getenv("SAFARI_WATCHDOG");
+    if (wd && atoi(wd) > 0) SDL_DetachThread(SDL_CreateThread(watchdog, "watchdog", (void *)(uintptr_t)atoi(wd)));
     return sys_display != NULL;
 }
 

@@ -13,15 +13,15 @@ of it (`SAFARI.iso`).
 ## Install (Fedora)
 
 ```
-sudo dnf install ./browning-safari-1.02-1.x86_64.rpm
+sudo dnf install ./browning-safari-1.02-2.x86_64.rpm
 ```
 
 If you'd rather build it on your own machine:
 
 ```
 sudo dnf install rpm-build cmake gcc SDL2-devel
-rpmbuild --rebuild browning-safari-1.02-1.src.rpm
-sudo dnf install ~/rpmbuild/RPMS/x86_64/browning-safari-1.02-1*.rpm
+rpmbuild --rebuild browning-safari-1.02-2.src.rpm
+sudo dnf install ~/rpmbuild/RPMS/x86_64/browning-safari-1.02-2*.rpm
 ```
 
 ## First start: importing the game data
@@ -90,9 +90,23 @@ Tip from the guide: don't go out without malaria pills.
 * Edge scrolling runs at a fixed rate of about 33 steps per second. The
   original scrolled once per frame, which would be far too fast on a modern
   PC.
-* Closing the window asks the same "Exit Browning African Safari?" question
-  as the in-game Exit button. During a hunt, leave through the Exit icon
-  first. Closing the window three times in a row always force-quits.
+* Closing the window (Alt+F4, the title-bar button, logging out, or "End
+  process" in System Monitor) quits right away from any screen, even in
+  the middle of a hunt or while someone is talking. Unsaved progress is
+  saved first, the same as answering "Save" in the original's exit dialog.
+  Rounds still in your gun go back in the box. The in-game Exit button
+  still asks before quitting, as it did in 1998.
+* Sound fixes. The original could lose track of which sound was playing on
+  which channel. A finished sound could then point at a different sound,
+  for example a looping one, and anything waiting for it to end would wait
+  forever. A malformed sound file can no longer make the game read past
+  the end of its data.
+* Pressing Enter or Esc closes one-button message boxes, such as
+  "Game Paused" / Resume.
+* Pressing Esc to skip someone's speech works even if you pressed another
+  key first.
+* The main loop no longer keeps a CPU core busy at 100%, and the screen is
+  redrawn at up to 60 frames per second.
 * The original logged to `C:\OQUIRRH.TXT`. The port writes the log to
   `~/.local/share/browning-safari/oquirrh.txt`.
 

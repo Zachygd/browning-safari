@@ -193,8 +193,25 @@ int GraphicsInit(void)
 }
 
 /* WinMain() of the original, minus the Windows plumbing */
+/* PORT: closing the window (Alt+F4, the title bar button, logging out)
+ * quits straight away.  Any game with unsaved progress is saved first,
+ * like answering "Save" in the original's exit dialog. */
+static void QuitFromWindow(void)
+{
+    if (player && game_screen == 0x11) {
+        PutAmmoBackInBox();          /* rounds in the gun go back in the box */
+        hunter.gunShells = 0;
+        hunter.ammo = -1;
+    }
+    for (int which = 0; which < 8; which++)
+        if (players[which].name[0] > ' ' && players[which].saved_game == 0) SaveGame(which);
+    SetGameOptions();
+    SoundExit();
+}
+
 int SafariMain(void)
 {
+    sys_quit_hook = QuitFromWindow;
     Log("Browning African Safari 1.0 Error Log");
     if (!CheckRegistry()) {
         Log("CheckRegistry failed");

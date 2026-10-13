@@ -75,7 +75,7 @@ static void mix(void *ud, Uint8 *stream, int len)
                 else { s->status = SMP_DONE; s->eos_pending = 1; break; }
             }
             int32_t smp;
-            if (bps == 1) smp = ((int32_t)s->data[ip] - 128) << 8;
+            if (bps == 1) smp = ((int32_t)s->data[ip] - 128) * 256;
             else smp = (int16_t)(s->data[ip * 2] | (s->data[ip * 2 + 1] << 8));
             acc[i] += (smp * vol) / 16129;
             s->pos += step;
@@ -90,24 +90,29 @@ static void mix(void *ud, Uint8 *stream, int len)
 }
 
 /* parse a RIFF/WAVE image into a sample */
-static int set_sample_file(SAMPLE *s, const uint8_t *img)
+static int set_sample_file(SAMPLE *s, const uint8_t *img, uint32_t size)
 {
-    if (!img || memcmp(img, "RIFF", 4) || memcmp(img + 8, "WAVE", 4)) return 0;
+    if (!img || size < 12 || memcmp(img, "RIFF", 4) || memcmp(img + 8, "WAVE", 4)) return 0;
     uint32_t riffLen = img[4] | img[5] << 8 | img[6] << 16 | (uint32_t)img[7] << 24;
     uint32_t o = 12, end = riffLen + 8;
+    if (end > size || end < riffLen) end = size;   /* never read past the buffer */
     s->data = NULL;
+    s->rate = 0;
+    s->bits = 0;
     while (o + 8 <= end) {
         uint32_t clen = img[o + 4] | img[o + 5] << 8 | img[o + 6] << 16 | (uint32_t)img[o + 7] << 24;
-        if (!memcmp(img + o, "fmt ", 4)) {
-            s->rate = img[o + 12] | img[o + 13] << 8 | img[o + 14] << 16 | img[o + 15] << 24;
+        if (!memcmp(img + o, "fmt ", 4) && o + 24 <= end) {
+            s->rate = img[o + 12] | img[o + 13] << 8 | img[o + 14] << 16 | (uint32_t)img[o + 15] << 24;
             s->bits = img[o + 22] | img[o + 23] << 8;
         } else if (!memcmp(img + o, "data", 4)) {
             s->data = img + o + 8;
-            s->len = clen;
+            s->len = clen <= end - (o + 8) ? clen : end - (o + 8);
         }
+        if (clen > end) break;
         o += 8 + clen + (clen & 1);
     }
     if (s->bits != 8 && s->bits != 16) s->bits = 8;
+    if (s->rate < 1000 || s->rate > 192000) s->rate = 22050;   /* a 0 rate would never finish */
     return s->data != NULL;
 }
 
@@ -133,6 +138,7 @@ int  sound_Music = 16, sound_Voice = 17, num_Sound_Effects = 39;
 static SAMPLE  *smp[NUM_SAMPLES];
 static int      num_voices;
 static uint8_t *sndptr[64];
+static uint32_t sndsize[64];
 static int      smp_handles[64];
 
 static int SoundShutoff(SAMPLE *s);
@@ -140,7 +146,7 @@ static int MusicShutoffCB(SAMPLE *s) { (void)s; return MusicShutoff(); }
 
 int SoundInit(void)
 {
-    for (int i = 0; i < num_Sound_Effects; i++) smp_handles[i] = -1;
+    for (int i = 0; i < 64; i++) smp_handles[i] = -1;
     SDL_AudioSpec want, have;
     SDL_zero(want);
     want.freq = OUT_RATE;
@@ -214,7 +220,8 @@ uint32_t SoundSeek(const char *file, int seek, int sndnum)
         filesize = seektable[seek] - seektable[seek - 1];
         FileSeek(fh, (long)seektable[seek - 1], 1);
     }
-    sndptr[sndnum] = malloc(filesize ? filesize : 1);
+    sndptr[sndnum] = calloc(1, filesize ? filesize : 1);
+    sndsize[sndnum] = filesize;
     if (!sndptr[sndnum]) {
         Log("ERROR: Out of memory: SoundSeek");
         FileClose(fh);
@@ -236,7 +243,8 @@ int SoundLoad(const char *file, int sndnum)
     if (fh == BAD_HANDLE) { Log("SoundLoad: unable to load %s", filename); return 0; }
     if (sndptr[sndnum]) { release_owner(sndptr[sndnum]); free(sndptr[sndnum]); sndptr[sndnum] = NULL; }
     uint32_t size = FileSize(fh);
-    sndptr[sndnum] = malloc(size ? size : 1);
+    sndptr[sndnum] = calloc(1, size ? size : 1);
+    sndsize[sndnum] = size;
     if (!sndptr[sndnum]) {
         Log("ERROR: Out of memory: SoundLoad");
         FileClose(fh);
@@ -258,12 +266,17 @@ static void start_on(int i, int sndnum, int loopForever)
     s->eos = NULL;
     s->eos_pending = 0;
     s->owner = sndptr[sndnum];
-    if (set_sample_file(s, sndptr[sndnum])) {
+    if (set_sample_file(s, sndptr[sndnum], sndsize[sndnum])) {
         if (loopForever) s->loops = 0;
         s->status = SMP_PLAYING;
         s->eos = SoundShutoff;
     }
     unlock();
+    /* PORT: forget any other sound still pointing at this voice, so that
+     * polling or stopping a finished sound can't touch the new one (the
+     * original could, e.g. wait forever on somebody else's looping sound) */
+    for (int j = 0; j < 64; j++)
+        if (j != sndnum && smp_handles[j] == i) smp_handles[j] = -1;
     smp_handles[sndnum] = i;
 }
 
@@ -274,20 +287,19 @@ void SoundLoop(int sndnum)
     int i;
     for (i = 0; i < num_voices && smp[i]->status != SMP_DONE; i++) {}
     if (i != num_voices) start_on(i, sndnum, 1);
+    else smp_handles[sndnum] = -1;
 }
 
-/* EOS callback.  (The original indexes smp_handles with the voice number
- * rather than the sound number; kept as-is.) */
+/* EOS callback: the sound that was playing on this voice has finished.
+ * (PORT FIX: the original cleared smp_handles[voice] instead of
+ * smp_handles[sound], leaving stale handles behind.) */
 static int SoundShutoff(SAMPLE *s)
 {
     for (int i = 0; i < num_voices; i++) {
-        if (smp[i] == s) {
-            for (int j = 0; j < num_Sound_Effects; j++) {
-                if (smp_handles[j] == i) {
-                    smp_handles[i] = -1;
-                    return 0;
-                }
-            }
+        if (smp[i] == s && s->status != SMP_PLAYING) {
+            for (int j = 0; j < 64; j++)
+                if (smp_handles[j] == i) smp_handles[j] = -1;
+            return 0;
         }
     }
     return 0;
@@ -299,7 +311,7 @@ void SoundPlay(int sndnum)
     if (!bSoundOkay || !sndptr[sndnum]) return;
     int i;
     for (i = 0; i < num_voices && smp[i]->status == SMP_PLAYING; i++) {}
-    if (i == num_voices) { Log("no slot available for %d", sndnum); return; }
+    if (i == num_voices) { Log("no slot available for %d", sndnum); smp_handles[sndnum] = -1; return; }
     start_on(i, sndnum, 0);
     SoundSetVolume(sndnum, sound_volume);
 }
@@ -491,7 +503,8 @@ void StartMusicLoop(const char *file)
 
 void WaitMusic(void)
 {
-    while (SoundPoll(sound_Music)) {}
+    /* a looping track never ends, so don't wait for one */
+    while (SoundPoll(sound_Music) && smp[smp_handles[sound_Music]]->loops != 0) {}
 }
 
 void StartVoice(const char *file, int comment)
