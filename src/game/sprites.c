@@ -8,7 +8,9 @@ static int unscale(int pos, int scale)
     return (int)((double)pos / ((double)scale / 100.0));
 }
 
-/* Is (xpos,ypos) inside the animal's vital area?  The kill zone masks are
+/* Is (xpos,ypos) inside the animal's vital area?
+ * (For a mirrored animal the column is width-1-x; the original used
+ * width-x, one pixel off, which wrapped onto the next row at the edge.)  The kill zone masks are
  * stored 200 graphics after the animal frames; 0xFF marks a vital spot. */
 int CheckKillZone(int which, int xpos, int ypos, int flip, int scale)
 {
@@ -19,7 +21,7 @@ int CheckKillZone(int which, int xpos, int ypos, int flip, int scale)
         ypos = unscale(ypos, scale);
     }
     int width = graphic[gr].width;
-    int offset = flip == 0 ? width * ypos + xpos : (width - xpos) + width * ypos;
+    int offset = flip == 0 ? width * ypos + xpos : (width - 1 - xpos) + width * ypos;
     if (offset < 0 || graphic[gr].height * width <= offset) {
         Log("ERROR CheckKillZone %d, %d, %d, %d, %d", which, xpos, ypos, flip, scale);
         return 0;
@@ -37,7 +39,7 @@ int CheckSpriteData(int which, int xpos, int ypos, int flip, int scale)
         ypos = unscale(ypos, scale);
     }
     int width = graphic[gr].width;
-    int offset = flip == 0 ? width * ypos + xpos : (width - xpos) + width * ypos;
+    int offset = flip == 0 ? width * ypos + xpos : (width - 1 - xpos) + width * ypos;
     if (offset < 0 || graphic[gr].height * width <= offset) {
         Log("ERROR CheckSpriteData %d, %d, %d, %d, %d", which, xpos, ypos, flip, scale);
         return 0;
@@ -45,7 +47,12 @@ int CheckSpriteData(int which, int xpos, int ypos, int flip, int scale)
     return graphic[gr].data[offset] != 0;
 }
 
-/* is the animal in front of the scenery at this screen position? */
+/* Is the animal in front of the scenery at this point? xpos is a panorama
+ * position (screen x + game_offset), the same way the animals are drawn.
+ * PORT FIX: the original passed the screen x, so unless you were looking
+ * at the start of the panorama, the bushes and rocks it tested against
+ * were from a different part of the scene: shots at a clear animal could
+ * be stopped by an invisible bush, and shots into a bush could hit. */
 int CheckLayer(int which, int xpos, int ypos)
 {
     if (!layer_map) return 1;

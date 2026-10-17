@@ -401,6 +401,22 @@ static void DoGoHome(int param)
     (void)param;
     int empty = 1;
     SoundPlay(0);
+#ifdef SAFARI_TESTHOOKS
+    if (getenv("SAFARI_TEST_BAG")) {
+        int n = atoi(getenv("SAFARI_TEST_BAG"));
+        for (int i = 0; i < n && i < 70; i++) {
+            int spc = i % 7;
+            huntbag[i].shot = 1;
+            huntbag[i].species = spc;
+            huntbag[i].trophy_fee = species[spc].trophy_fee;
+            huntbag[i].charging = (i == 2);
+            huntbag[i].provoked = 0;
+            player->gamebag[spc]++;
+            num_permits[spc] = 10;
+        }
+        player->dollars += 500000;
+    }
+#endif
     for (int i = 0; i < 70; i++) {
         if (huntbag[i].shot != 0) { empty = 0; break; }
     }

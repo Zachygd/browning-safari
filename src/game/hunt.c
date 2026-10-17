@@ -1048,8 +1048,49 @@ static int screenX(int x)
 }
 
 /* -------------------------------------------------------- main loop -- */
+#ifdef SAFARI_TESTHOOKS
+/* test builds: find a screen point that would be a kill (or with
+ * SAFARI_TEST_AIM=wound, a body hit outside the kill zone) */
+static int test_find_aim(int *ax, int *ay)
+{
+    const char *mode = getenv("SAFARI_TEST_AIM");
+    if (!mode) return 0;
+    int want_kill = strcmp(mode, "wound") != 0;
+    for (int k = 0; k < number_of_species; k++) {
+        int s = sp_sort[k];
+        SPRITE *sp = &sprites[s];
+        if (!sp->active || sp->shot || sp->species == 0xff) continue;
+        if (sp->screenx < 1 || sp->screenx + sp->bw > 639) continue;
+        for (int y = sp->by; y < sp->by + sp->bh && y < 0x168; y++)
+            for (int x = sp->screenx; x < sp->screenx + sp->bw; x++)
+                if (CheckLayer(s, x + game_offset, y) &&
+                    CheckSpriteData(s, x - sp->screenx, y - sp->by, sp->flip, sp->percent) &&
+                    !!CheckKillZone(s, x - sp->screenx, y - sp->by, sp->flip, sp->percent) == want_kill) {
+                    *ax = x; *ay = y;
+                    return 1;
+                }
+    }
+    return 0;
+}
+
+static void test_aim(void)
+{
+    static uint32_t last;
+    if (!getenv("SAFARI_TEST_AIM") || GetLapCount() - last < 1000) return;
+    last = GetLapCount();
+    for (int k = 0; k < number_of_species; k++)
+        Log("SPR %d act %d spc %d x %d screenx %d by %d bw %d bh %d off %d", k, sprites[k].active,
+            sprites[k].species, sprites[k].x, sprites[k].screenx, sprites[k].by, sprites[k].bw, sprites[k].bh, game_offset);
+    int x, y;
+    if (test_find_aim(&x, &y)) Log("AIM %d %d", x, y);
+}
+#endif
+
 void DoHuntScreen(void)
 {
+#ifdef SAFARI_TESTHOOKS
+    test_aim();
+#endif
     if (mouseY < 0x14a) {
         if (mouseX < 0x32) MoveScreen(-(0x32 - mouseX));
         else if (mouseX > 0x24e) MoveScreen(mouseX - 0x24e);
@@ -1139,7 +1180,13 @@ void DoHuntScreen(void)
     lastMouseX = mouseX;
     lastMouseY = mouseY;
     if (pending_comment != 0 && SoundPoll(hunter.weapon + 10) == 0) {
-        if (pending_comment < 0xb) PlayGuideSound(pending_comment + 0x1d);
+        /* PORT FIX: remarks 1-10 are preloaded into sounds 0x1d-0x26, so
+         * remark N is sound 0x1c + N. The original added 0x1d and played
+         * the next clip in the guide's list: a kill could get "I hope we
+         * can find him", a wound "this could mean trouble", and remark 10
+         * nothing at all. */
+        if (debug) Log("guide remark %d", pending_comment);
+        if (pending_comment < 0xb) PlayGuideSound(pending_comment + 0x1c);
         else DoGuideVoice(player->guide + 1, pending_comment);
         pending_comment = 0;
     }
@@ -1208,6 +1255,9 @@ void ShootGun(void)
         hunter.gun_empty = 1;
         return;
     }
+#ifdef SAFARI_TESTHOOKS
+    if (test_find_aim(&mx, &my)) Log("TESTSHOT %d %d (%s)", mx, my, getenv("SAFARI_TEST_AIM"));
+#endif
     SoundPlay(hunter.weapon + 10);
     hunter.gunShells--;
     if (hunter.weapon != 2) hunter.shots_fired = 1;
@@ -1238,7 +1288,7 @@ void ShootGun(void)
                 if (pending_comment == 0 && rand() % 5 == 3) pending_comment = rand() % 2 + 9;
             }
         } else if (bbx <= mx && mx < sp->bw + bbx && bby <= my && my < sp->bh + bby &&
-                   CheckLayer(s, mx, my) &&
+                   CheckLayer(s, mx + game_offset, my) &&
                    CheckSpriteData(s, mx - bbx, my - bby, sp->flip, sp->percent)) {
             if (CheckKillZone(s, mx - bbx, my - bby, sp->flip, sp->percent)) {
                 sp->shot = 1;
@@ -1262,6 +1312,7 @@ void ShootGun(void)
         }
     }
     if (hunter.weapon != 2) ScareAnimals();
+    if (debug) Log("ShootGun: %s", got_him == -1 ? "no kill" : "kill");
     if (got_him == -1) return;
     if (species[sp->species].dangerous == 0 || hunter.weapon != 1) {
         GAMEBAG *b = &huntbag[hunter.gameBagNum];
