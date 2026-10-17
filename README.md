@@ -13,15 +13,15 @@ of it (`SAFARI.iso`).
 ## Install (Fedora)
 
 ```
-sudo dnf install ./browning-safari-1.02-2.x86_64.rpm
+sudo dnf install ./browning-safari-1.02-3.x86_64.rpm
 ```
 
 If you'd rather build it on your own machine:
 
 ```
 sudo dnf install rpm-build cmake gcc SDL2-devel
-rpmbuild --rebuild browning-safari-1.02-2.src.rpm
-sudo dnf install ~/rpmbuild/RPMS/x86_64/browning-safari-1.02-2*.rpm
+rpmbuild --rebuild browning-safari-1.02-3.src.rpm
+sudo dnf install ~/rpmbuild/RPMS/x86_64/browning-safari-1.02-3*.rpm
 ```
 
 ## First start: importing the game data
@@ -83,6 +83,14 @@ Tip from the guide: don't go out without malaria pills.
   animals. The original worked out the species ratio with integer division,
   which always gave 0%. It now uses the same formula as the three-species
   case.
+* **Bug fix:** the guide's remarks after a shot were off by one in the
+  original: each remark played the next clip in the guide's list, so a
+  clean kill could get "I hope we can find him" and a wounding shot "this
+  could mean trouble" or "you missed it". Each shot now gets its own remark.
+* **Bug fix:** a shot was tested against the scenery (bushes, rocks) of the
+  wrong part of the panorama, the left end of it, instead of the part on
+  screen. Shots at a clearly visible animal could be stopped by an
+  invisible bush, and shots into a bush could hit what was behind it.
 * **Bug fix:** the museum's scrolling loop started from the wrong hot spot.
   This one had no visible effect.
 * The binoculars are always lowered at the start of a hunt. Before, they

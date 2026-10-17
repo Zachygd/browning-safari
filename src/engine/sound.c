@@ -142,6 +142,8 @@ static uint32_t sndsize[64];
 static int      smp_handles[64];
 
 static int SoundShutoff(SAMPLE *s);
+/* sound number valid and sound running */
+#define SND_OK(n) (bSoundOkay && (n) >= 0 && (n) < 64)
 static int MusicShutoffCB(SAMPLE *s) { (void)s; return MusicShutoff(); }
 
 int SoundInit(void)
@@ -201,7 +203,7 @@ uint32_t SoundSeek(const char *file, int seek, int sndnum)
     if (debug) Log("SoundSeek(%s, %d, %d)", file, seek, sndnum);
     if (!bSoundOkay) return 0;
     if (*file == 0) return 0;
-    if (num_Sound_Effects < sndnum) { Log("ERROR: SoundSeek -- too many sounds"); return 0; }
+    if (num_Sound_Effects < sndnum || sndnum < 0) { Log("ERROR: SoundSeek -- too many sounds"); return 0; }
     soundPath(filename, sizeof filename, file);
     FHANDLE fh = FileOpen(filename);
     if (fh == BAD_HANDLE) { Log("unable to open %s", filename); return 0; }
@@ -237,7 +239,7 @@ int SoundLoad(const char *file, int sndnum)
 {
     if (debug) Log("SoundLoad(%s, %d)", file, sndnum);
     if (!bSoundOkay) return 0;
-    if (num_Sound_Effects < sndnum) { Log("ERROR: SoundLoad -- too many sounds"); return 0; }
+    if (num_Sound_Effects < sndnum || sndnum < 0) { Log("ERROR: SoundLoad -- too many sounds"); return 0; }
     soundPath(filename, sizeof filename, file);
     FHANDLE fh = FileOpen(filename);
     if (fh == BAD_HANDLE) { Log("SoundLoad: unable to load %s", filename); return 0; }
@@ -283,7 +285,7 @@ static void start_on(int i, int sndnum, int loopForever)
 void SoundLoop(int sndnum)
 {
     if (debug) Log("SoundLoop(%d)", sndnum);
-    if (!bSoundOkay || !sndptr[sndnum]) return;
+    if (!SND_OK(sndnum) || !sndptr[sndnum]) return;
     int i;
     for (i = 0; i < num_voices && smp[i]->status != SMP_DONE; i++) {}
     if (i != num_voices) start_on(i, sndnum, 1);
@@ -308,7 +310,7 @@ static int SoundShutoff(SAMPLE *s)
 void SoundPlay(int sndnum)
 {
     if (debug) Log("SoundPlay(%d)", sndnum);
-    if (!bSoundOkay || !sndptr[sndnum]) return;
+    if (!SND_OK(sndnum) || !sndptr[sndnum]) return;
     int i;
     for (i = 0; i < num_voices && smp[i]->status == SMP_PLAYING; i++) {}
     if (i == num_voices) { Log("no slot available for %d", sndnum); smp_handles[sndnum] = -1; return; }
@@ -319,7 +321,7 @@ void SoundPlay(int sndnum)
 void SoundStop(int sndnum)
 {
     if (debug) Log("SoundStop(%d)", sndnum);
-    if (bSoundOkay && smp_handles[sndnum] != -1) {
+    if (SND_OK(sndnum) && smp_handles[sndnum] != -1) {
         lock();
         SAMPLE *s = smp[smp_handles[sndnum]];
         s->status = SMP_DONE;
@@ -334,7 +336,7 @@ void SoundStop(int sndnum)
 void SoundFree(int sndnum)
 {
     if (debug) Log("SoundFree(%d)", sndnum);
-    if (bSoundOkay && sndptr[sndnum]) {
+    if (SND_OK(sndnum) && sndptr[sndnum]) {
         if (smp_handles[sndnum] != -1) SoundStop(sndnum);
         if (smp_handles[sndnum] == -1 && sndptr[sndnum]) {
             release_owner(sndptr[sndnum]);
@@ -352,16 +354,20 @@ void SoundStopAll(void)
 
 void SoundWait(int sndnum)
 {
-    if (bSoundOkay && smp_handles[sndnum] != -1) {
-        while (smp[smp_handles[sndnum]]->status == SMP_PLAYING) GetLapCount();
-        smp_handles[sndnum] = -1;
-    }
+    /* PORT FIX: GetLapCount() runs the end-of-sound callbacks, which can
+     * clear this sound's handle while we wait. Re-read it every time (the
+     * old loop then indexed voice -1 and crashed, e.g. in the trophy fee
+     * tally at the airport). */
+    if (!SND_OK(sndnum)) return;
+    int h;
+    while ((h = smp_handles[sndnum]) != -1 && smp[h]->status == SMP_PLAYING) GetLapCount();
+    smp_handles[sndnum] = -1;
 }
 
 int SoundPoll(int sndnum)
 {
     sys_pump();
-    if (!bSoundOkay || smp_handles[sndnum] == -1) return 0;
+    if (!SND_OK(sndnum) || smp_handles[sndnum] == -1) return 0;
     return smp[smp_handles[sndnum]]->status == SMP_PLAYING;
 }
 
@@ -373,13 +379,13 @@ int SoundPosition(int sndhandle)
 
 int SoundGetVolume(int sndnum)
 {
-    if (!bSoundOkay || smp_handles[sndnum] == -1) return 0;
+    if (!SND_OK(sndnum) || smp_handles[sndnum] == -1) return 0;
     return (int)(smp[smp_handles[sndnum]]->volume / 1.27);
 }
 
 void SoundSetVolume(int sndnum, int volume)
 {
-    if (bSoundOkay && smp_handles[sndnum] != -1) {
+    if (SND_OK(sndnum) && smp_handles[sndnum] != -1) {
         int v = (int)(volume * 1.27);
         if (v < 0) v = 0;
         if (v > 127) v = 127;
@@ -409,13 +415,13 @@ void SoundSetMasterVolume(int volume)
 
 int SoundGetFrequency(int sndnum)
 {
-    if (!bSoundOkay || smp_handles[sndnum] == -1) return 0;
+    if (!SND_OK(sndnum) || smp_handles[sndnum] == -1) return 0;
     return smp[smp_handles[sndnum]]->rate;
 }
 
 void SoundSetFrequency(int sndnum, int pitch)
 {
-    if (bSoundOkay && smp_handles[sndnum] != -1) {
+    if (SND_OK(sndnum) && smp_handles[sndnum] != -1) {
         lock();
         smp[smp_handles[sndnum]]->rate = pitch;
         unlock();
@@ -437,7 +443,7 @@ void SoundFade(int sndnum)
 
 void SoundPause(int sndnum)
 {
-    if (bSoundOkay && smp_handles[sndnum] != -1) {
+    if (SND_OK(sndnum) && smp_handles[sndnum] != -1) {
         lock();
         SAMPLE *s = smp[smp_handles[sndnum]];
         if (s->status == SMP_PLAYING) s->status = SMP_STOPPED;
@@ -447,7 +453,7 @@ void SoundPause(int sndnum)
 
 void SoundResume(int sndnum)
 {
-    if (bSoundOkay && smp_handles[sndnum] != -1) {
+    if (SND_OK(sndnum) && smp_handles[sndnum] != -1) {
         lock();
         SAMPLE *s = smp[smp_handles[sndnum]];
         if (s->status == SMP_STOPPED) s->status = SMP_PLAYING;
