@@ -7,6 +7,9 @@ shipped on the CD. Game logic, timing, random numbers and floating-point
 behaviour follow the original. The Windows-only parts (SciTech MGL graphics,
 Miles Sound System, DirectX) were replaced with SDL2.
 
+![Uploading image.png…]()
+
+
 **No game data is included.** You need your own copy of the CD, or an image
 of it (`SAFARI.iso`).
 
