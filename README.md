@@ -24,6 +24,22 @@ rpmbuild --rebuild browning-safari-1.02-3.src.rpm
 sudo dnf install ~/rpmbuild/RPMS/x86_64/browning-safari-1.02-3*.rpm
 ```
 
+## AppImage (any distro)
+
+Download `Browning_African_Safari-1.02-3-x86_64.AppImage`, then:
+
+```
+chmod +x Browning_African_Safari-1.02-3-x86_64.AppImage
+./Browning_African_Safari-1.02-3-x86_64.AppImage
+```
+
+Nothing is installed: you can also double-click the file in your file
+manager. It needs a 64-bit Linux from about 2023 or newer (glibc 2.38:
+Fedora 39+, Ubuntu 24.04+). To build one yourself: `tools/build-appimage.sh`
+(output in `out/`). If it says FUSE is missing, run it with
+`--appimage-extract-and-run`, or install `fuse-libs` (Fedora) / `libfuse2`
+(Ubuntu).
+
 ## First start: importing the game data
 
 Start **Browning African Safari** from the application menu. The first time,
