@@ -7,7 +7,7 @@ shipped on the CD. Game logic, timing, random numbers and floating-point
 behaviour follow the original. The Windows-only parts (SciTech MGL graphics,
 Miles Sound System, DirectX) were replaced with SDL2.
 
-![Uploading image.png…]()
+<img width="1134" height="842" alt="image" src="https://github.com/user-attachments/assets/84486332-6f27-4b23-9c37-b47ccba87511" />
 
 
 **No game data is included.** You need your own copy of the CD, or an image
